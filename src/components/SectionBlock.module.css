@@ -1,0 +1,13 @@
+.block {
+  padding: 8px 0 28px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: 24px;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}

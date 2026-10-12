@@ -1,0 +1,46 @@
+.wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.input {
+  width: min(220px, 40vw);
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: 3px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--color-ink);
+  background: var(--color-page);
+}
+
+/* Su smartphone il campo prende la riga intera sotto la barra */
+@media (max-width: 599px) {
+  .form {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    top: 100%;
+    z-index: 20;
+    padding: 10px;
+    background: var(--color-page);
+    border: 1px solid var(--color-rule);
+    box-shadow: 0 6px 16px rgb(0 0 0 / 0.08);
+  }
+
+  .input {
+    flex: 1;
+    width: auto;
+  }
+}

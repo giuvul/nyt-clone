@@ -1,0 +1,13 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Single page application: ogni percorso è gestito da React Router.
+# Le richieste /api/* sono servite prima dalla Netlify Function.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

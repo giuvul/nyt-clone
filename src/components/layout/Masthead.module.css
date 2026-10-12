@@ -1,0 +1,20 @@
+.masthead {
+  font-family: var(--font-masthead);
+  font-weight: 400;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.masthead a {
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.large {
+  font-size: clamp(30px, 7.4vw, 66px);
+}
+
+.small {
+  font-size: clamp(22px, 5vw, 30px);
+}
