@@ -41,7 +41,7 @@ export default function Header() {
           <Link to="/saved" className={styles.saved}>
             <BookmarkIcon size={16} filled={saved.length > 0} />
             <span className={styles.savedLabel}>Saved</span>
-            <span className={styles.count} aria-label={`${saved.length} saved articles`}>
+            <span className={styles.count} aria-label={`${saved.length} saved ${saved.length === 1 ? "article" : "articles"}`}>
               {saved.length}
             </span>
           </Link>

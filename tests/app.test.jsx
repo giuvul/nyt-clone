@@ -111,7 +111,7 @@ describe("saved articles", () => {
     const { user, storage } = renderApp();
     await user.click(await screen.findByRole("button", { name: "Save “Home story 2” for later" }));
 
-    expect(screen.getByLabelText("1 saved articles")).toBeInTheDocument();
+    expect(screen.getByLabelText("1 saved article")).toBeInTheDocument();
     expect(JSON.parse(storage.data["nyt-clone:saved"])[0].title).toBe("Home story 2");
 
     await user.click(screen.getByRole("link", { name: /Saved/ }));
