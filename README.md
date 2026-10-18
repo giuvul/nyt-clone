@@ -112,7 +112,9 @@ riprova tra un minuto") in un solo punto.
 **Context API invece di Redux.** Lo stato condiviso è poco: la cache delle notizie e gli articoli
 salvati. Due context con `useReducer` bastano, senza dipendenze in più. La cache evita richieste
 inutili: tornando alla home dopo aver visto una sezione, le notizie compaiono subito e l'API non
-viene richiamata per 5 minuti.
+viene richiamata per 5 minuti. Per decidere se una risposta è ancora fresca, `load` consulta un
+ref con l'ora dell'ultimo caricamento riuscito per ogni chiave, aggiornato quando arriva la
+risposta; gli hook gli passano loader stabili creati con `useCallback`.
 
 **Repository + Dependency Injection.** `NewsProvider` riceve l'api come prop. In produzione
 `main.jsx` passa quella reale, nei test un oggetto finto con gli stessi tre metodi. Così tutta l'app
@@ -156,30 +158,6 @@ indentazione, punto e virgola, virgolette doppie, un componente per file.
 ```bash
 npm test
 ```
-
-## Modifiche dopo la revisione
-
-La revisione di Start2Impact ha segnalato due punti, entrambi corretti:
-
-1. **Ref aggiornati durante il render** (`store/NewsContext.jsx`). Il corpo di un componente deve
-   essere puro: React può eseguire un render più volte o scartarlo, e un ref assegnato lì può
-   contenere un valore mai confermato.
-   - `entriesRef` (una copia dell'intero stato) non c'è più. A `load` serve sapere solo se una
-     chiave è già stata caricata con successo e quando: questo dato vive in un ref dedicato,
-     `loadedAt`, aggiornato nel momento del successo, come già succedeva con `inFlight`.
-   - `loaderRef` non c'è più. Ogni hook crea il proprio loader con `useCallback`, legato alla sezione
-     richiesta: è stabile, quindi può stare tra le dipendenze dell'effetto senza farlo ripartire.
-     Ho preferito questa strada a `useEffectEvent` perché lo stesso loader serve anche a `reload`,
-     che parte dal clic su *Refresh* o *Try again*, e una funzione di `useEffectEvent` si può
-     chiamare solo dentro un effetto.
-2. **Cache in memoria del proxy senza limite** (`server/nytProxy.js`). Ora ha un massimo di 100
-   voci: quando lo supera elimina la più vecchia, cioè la prima chiave della `Map`, che mantiene
-   l'ordine di inserimento. Riscrivere una chiave la sposta in fondo, come voce più recente.
-
-Facendo girare le regole di `eslint-plugin-react-hooks` ho trovato e corretto un terzo punto della
-stessa famiglia: in `SearchPage` un effetto copiava la query dell'URL nel campo di ricerca con
-`setState`. Ora il form è un componente con `key={query}`, che riparte da solo quando la ricerca
-cambia. Il lint ora non segnala più niente, e i test sono passati da 67 a 76.
 
 ## Provarlo in locale
 
