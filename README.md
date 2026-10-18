@@ -58,6 +58,8 @@ Il browser non chiama mai direttamente il NYT. Le richieste passano da una **Net
 3. **Si resta nei limiti.** L'API gratuita consente 5 richieste al minuto e 500 al giorno. Le
    risposte vengono salvate dalla CDN di Netlify (10 minuti per le Top Stories, 1 ora per Most
    Popular, 30 minuti per le ricerche): migliaia di visitatori producono poche chiamate reali.
+   Il proxy tiene anche una piccola cache in memoria, limitata a 100 voci: oltre quel numero
+   elimina la più vecchia, così richieste di ricerca sempre diverse non fanno crescere la memoria.
 
 In sviluppo lo stesso codice del proxy gira come middleware di Vite, con la chiave letta da `.env`.
 
@@ -123,7 +125,9 @@ una notizia.
 
 **Hooks.** `useState`, `useEffect`, `useReducer`, `useMemo`, `useCallback`, `useRef`, `useContext`
 più tre hook personalizzati: `useTopStories`, `useMostPopular` e `useArticleSearch` (che ignora le
-risposte arrivate in ritardo dopo una nuova ricerca).
+risposte arrivate in ritardo dopo una nuova ricerca). Il render dei componenti resta puro: i ref si
+aggiornano solo dentro effetti e callback, mai nel corpo del componente, e nessun effetto copia
+props nello stato. Lo verifico con le regole ufficiali di `eslint-plugin-react-hooks`.
 
 **Design.** Font liberi vicini a quelli del giornale: *Source Serif 4* per titoli e testo, *Libre
 Franklin* (erede del Franklin Gothic usato dal NYT) per menu e didascalie, *Chomsky* per la testata,
@@ -136,21 +140,46 @@ indentazione, punto e virgola, virgolette doppie, un componente per file.
 
 ## Test
 
-67 test automatici con **Vitest** e **Testing Library**, senza chiamate di rete.
+76 test automatici con **Vitest** e **Testing Library**, senza chiamate di rete.
 
 | File | Cosa verifica |
 | --- | --- |
-| `nytProxy.test.js` | endpoint ammessi e rifiutati, chiave aggiunta lato server e mai restituita, 429 e errori non in cache, header di cache, cache in memoria |
+| `nytProxy.test.js` | endpoint ammessi e rifiutati, chiave aggiunta lato server e mai restituita, 429 e errori non in cache, header di cache, cache in memoria con limite di voci |
 | `article.test.js` | i tre formati dell'API, scelta del formato di foto, campi mancanti, doppioni |
 | `nytApi.test.js` | URL e parametri chiamati, messaggi di errore |
 | `homeLayout.test.js` | divisione della home in apertura, secondarie, Opinion e fasce per sezione |
+| `newsContext.test.jsx` | cache delle notizie: niente nuove richieste finché i dati sono freschi, nuova richiesta quando scadono, Refresh forzato, errori non in cache, una sola richiesta anche in Strict Mode |
 | `reducers.test.js` | cache delle notizie e articoli salvati |
 | `format.test.js` | date in stile AP ("Oct. 12, 2026"), "3h ago" |
-| `app.test.jsx` | integrazione: home, navigazione con cache, sezione Books, 404, menu, errore e Try again, salvataggio, ricerca con Show more e ordinamento, titoli inseriti come testo |
+| `app.test.jsx` | integrazione: home, navigazione con cache, sezione Books, 404, menu, errore e Try again, salvataggio, ricerca con Show more e ordinamento, campo di ricerca aggiornato da una nuova ricerca, titoli inseriti come testo |
 
 ```bash
 npm test
 ```
+
+## Modifiche dopo la revisione
+
+La revisione di Start2Impact ha segnalato due punti, entrambi corretti:
+
+1. **Ref aggiornati durante il render** (`store/NewsContext.jsx`). Il corpo di un componente deve
+   essere puro: React può eseguire un render più volte o scartarlo, e un ref assegnato lì può
+   contenere un valore mai confermato.
+   - `entriesRef` (una copia dell'intero stato) non c'è più. A `load` serve sapere solo se una
+     chiave è già stata caricata con successo e quando: questo dato vive in un ref dedicato,
+     `loadedAt`, aggiornato nel momento del successo, come già succedeva con `inFlight`.
+   - `loaderRef` non c'è più. Ogni hook crea il proprio loader con `useCallback`, legato alla sezione
+     richiesta: è stabile, quindi può stare tra le dipendenze dell'effetto senza farlo ripartire.
+     Ho preferito questa strada a `useEffectEvent` perché lo stesso loader serve anche a `reload`,
+     che parte dal clic su *Refresh* o *Try again*, e una funzione di `useEffectEvent` si può
+     chiamare solo dentro un effetto.
+2. **Cache in memoria del proxy senza limite** (`server/nytProxy.js`). Ora ha un massimo di 100
+   voci: quando lo supera elimina la più vecchia, cioè la prima chiave della `Map`, che mantiene
+   l'ordine di inserimento. Riscrivere una chiave la sposta in fondo, come voce più recente.
+
+Facendo girare le regole di `eslint-plugin-react-hooks` ho trovato e corretto un terzo punto della
+stessa famiglia: in `SearchPage` un effetto copiava la query dell'URL nel campo di ricerca con
+`setState`. Ora il form è un componente con `key={query}`, che riparte da solo quando la ricerca
+cambia. Il lint ora non segnala più niente, e i test sono passati da 67 a 76.
 
 ## Provarlo in locale
 

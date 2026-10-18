@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "react-router";
 import ArticleCard from "../components/ArticleCard.jsx";
 import { EmptyMessage, ErrorMessage, LoadingSkeleton } from "../components/StatusMessage.jsx";
@@ -20,18 +20,8 @@ export default function SearchPage() {
   const [params, setParams] = useSearchParams();
   const query = (params.get("q") ?? "").trim();
   const sort = SORTS.some((item) => item.value === params.get("sort")) ? params.get("sort") : "relevance";
-  const [draft, setDraft] = useState(query);
   const search = useArticleSearch(query, sort);
   useDocumentTitle(query ? `Search: ${query}` : "Search");
-
-  // Se la ricerca cambia dall'esterno (barra in alto, Indietro) il campo si aggiorna.
-  useEffect(() => setDraft(query), [query]);
-
-  function handleSubmit(event) {
-    event.preventDefault();
-    const trimmed = draft.trim();
-    if (trimmed) setParams({ q: trimmed, sort });
-  }
 
   function handleSort(event) {
     setParams({ q: query, sort: event.target.value });
@@ -42,18 +32,9 @@ export default function SearchPage() {
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>Search</h1>
-      <form role="search" className={styles.form} onSubmit={handleSubmit}>
-        <input
-          type="search"
-          className={styles.input}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="Search the archive since 1851"
-          aria-label="Search articles"
-          maxLength={200}
-        />
-        <button type="submit" className="button">Search</button>
-      </form>
+      {/* key: se la ricerca cambia dall'esterno (barra in alto, Indietro)
+          il campo riparte dal nuovo testo, senza effetti di sincronizzazione. */}
+      <SearchForm key={query} initialQuery={query} onSearch={(text) => setParams({ q: text, sort })} />
 
       {query && search.status === "success" && (
         <div className={styles.toolbar}>
@@ -96,5 +77,30 @@ export default function SearchPage() {
         </button>
       )}
     </div>
+  );
+}
+
+function SearchForm({ initialQuery, onSearch }) {
+  const [draft, setDraft] = useState(initialQuery);
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    const trimmed = draft.trim();
+    if (trimmed) onSearch(trimmed);
+  }
+
+  return (
+    <form role="search" className={styles.form} onSubmit={handleSubmit}>
+      <input
+        type="search"
+        className={styles.input}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        placeholder="Search the archive since 1851"
+        aria-label="Search articles"
+        maxLength={200}
+      />
+      <button type="submit" className="button">Search</button>
+    </form>
   );
 }

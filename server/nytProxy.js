@@ -70,7 +70,13 @@ function successResponse(body, kind) {
 
 // Cache in memoria: evita di richiamare l'API per la stessa risposta finché
 // l'istanza resta attiva (utile soprattutto in sviluppo, dove non c'è la CDN).
-export function createMemoryCache({ ttlMs = 5 * 60 * 1000, now = Date.now } = {}) {
+// Ha un numero massimo di voci: la ricerca accetta testi sempre diversi, e
+// senza limite chi inviasse richieste tutte diverse farebbe crescere la
+// memoria senza fermarsi. Oltre il limite si elimina la voce più vecchia.
+export const MAX_CACHE_ENTRIES = 100;
+
+export function createMemoryCache({ ttlMs = 5 * 60 * 1000, maxEntries = MAX_CACHE_ENTRIES, now = Date.now } = {}) {
+  // Una Map conserva l'ordine di inserimento: la prima chiave è la più vecchia.
   const entries = new Map();
   return {
     get(key) {
@@ -83,7 +89,15 @@ export function createMemoryCache({ ttlMs = 5 * 60 * 1000, now = Date.now } = {}
       return entry.body;
     },
     set(key, body) {
+      // Cancellare prima di reinserire sposta la voce in fondo: è la più recente.
+      entries.delete(key);
       entries.set(key, { body, savedAt: now() });
+      while (entries.size > maxEntries) {
+        entries.delete(entries.keys().next().value);
+      }
+    },
+    get size() {
+      return entries.size;
     },
   };
 }

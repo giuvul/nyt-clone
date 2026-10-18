@@ -146,6 +146,20 @@ describe("search", () => {
     expect(api.calls.search.map((call) => call.page)).toEqual([0, 1, 2]);
   });
 
+  it("updates the search field when a new search starts from the header", async () => {
+    const { user } = renderApp({ path: "/search?q=mars" });
+    const pageField = () => within(screen.getByRole("main")).getByRole("searchbox", { name: "Search articles" });
+    await screen.findByText("25 results for “mars”");
+    expect(pageField()).toHaveValue("mars");
+
+    const header = screen.getByRole("banner");
+    await user.click(within(header).getByRole("button", { name: "Search" }));
+    await user.type(within(header).getByRole("searchbox"), "venus{Enter}");
+
+    expect(await screen.findByText("25 results for “venus”")).toBeInTheDocument();
+    expect(pageField()).toHaveValue("venus");
+  });
+
   it("changes the sort order from the toolbar", async () => {
     const { api, user } = renderApp({ path: "/search?q=mars" });
     await screen.findByText("25 results for “mars”");

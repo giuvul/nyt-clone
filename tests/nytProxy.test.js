@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryCache, handleNytRequest, resolveNytRoute } from "../server/nytProxy.js";
+import { createMemoryCache, handleNytRequest, MAX_CACHE_ENTRIES, resolveNytRoute } from "../server/nytProxy.js";
 
 const params = (query = "") => new URLSearchParams(query);
 const request = (path, init) => new Request(`https://clone.example${path}`, init);
@@ -123,5 +123,32 @@ describe("createMemoryCache", () => {
     expect(cache.get("a")).toBe("body");
     time = 1001;
     expect(cache.get("a")).toBeNull();
+  });
+
+  it("never holds more than maxEntries, dropping the oldest first", () => {
+    const cache = createMemoryCache({ maxEntries: 3 });
+    for (const key of ["a", "b", "c", "d"]) cache.set(key, key);
+    expect(cache.size).toBe(3);
+    expect(cache.get("a")).toBeNull();
+    expect(["b", "c", "d"].map((key) => cache.get(key))).toEqual(["b", "c", "d"]);
+  });
+
+  it("treats a rewritten entry as the newest", () => {
+    const cache = createMemoryCache({ maxEntries: 2 });
+    cache.set("a", "old");
+    cache.set("b", "b");
+    cache.set("a", "new");
+    cache.set("c", "c");
+    expect(cache.get("b")).toBeNull();
+    expect(cache.get("a")).toBe("new");
+  });
+
+  it("stays bounded under many different searches", async () => {
+    const cache = createMemoryCache();
+    const fetchImpl = okFetch();
+    for (let n = 0; n < MAX_CACHE_ENTRIES + 50; n++) {
+      await handleNytRequest(request(`/api/search?q=query-${n}`), { apiKey: "k", fetchImpl, cache });
+    }
+    expect(cache.size).toBe(MAX_CACHE_ENTRIES);
   });
 });

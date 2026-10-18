@@ -11,21 +11,25 @@ const NewsContext = createContext(null);
 // quella reale, nei test un oggetto finto con gli stessi metodi.
 export function NewsProvider({ api, children, now = Date.now }) {
   const [entries, dispatch] = useReducer(newsReducer, initialNewsState);
-  const entriesRef = useRef(entries);
+  // Due registri che load deve consultare senza dipendere dallo stato:
+  // le richieste in corso e l'ora dell'ultimo caricamento riuscito per chiave.
+  // Si aggiornano solo dentro load (effetti e clic), mai durante il render.
   const inFlight = useRef(new Set());
-  entriesRef.current = entries;
+  const loadedAt = useRef(new Map());
 
   const load = useCallback(
     async (key, loader, { force = false } = {}) => {
-      const entry = entriesRef.current[key];
-      const isFresh = entry?.status === "success" && now() - entry.updatedAt < FRESH_FOR_MS;
+      const lastSuccess = loadedAt.current.get(key);
+      const isFresh = lastSuccess !== undefined && now() - lastSuccess < FRESH_FOR_MS;
       if (inFlight.current.has(key) || (isFresh && !force)) return;
 
       inFlight.current.add(key);
       dispatch({ type: "request", key });
       try {
         const data = await loader(api);
-        dispatch({ type: "success", key, data, at: now() });
+        const at = now();
+        loadedAt.current.set(key, at);
+        dispatch({ type: "success", key, data, at });
       } catch (error) {
         dispatch({ type: "failure", key, error: describeApiError(error) });
       } finally {
@@ -46,16 +50,16 @@ export function useNews() {
 }
 
 // Carica (o riprende dalla cache) una risorsa e ne restituisce lo stato.
+// Il loader deve essere stabile (useCallback): cambia solo quando cambia la
+// risorsa richiesta, quindi può stare tra le dipendenze dell'effetto.
 function useNewsResource(key, loader) {
   const { entries, load } = useNews();
-  const loaderRef = useRef(loader);
-  loaderRef.current = loader;
 
   useEffect(() => {
-    load(key, (api) => loaderRef.current(api));
-  }, [key, load]);
+    load(key, loader);
+  }, [key, loader, load]);
 
-  const reload = useCallback(() => load(key, (api) => loaderRef.current(api), { force: true }), [key, load]);
+  const reload = useCallback(() => load(key, loader, { force: true }), [key, loader, load]);
   const entry = entries[key] ?? EMPTY_ENTRY;
   // Prima che l'effetto parta la voce non esiste ancora: è già "in caricamento".
   const status = entry.status === "idle" ? "loading" : entry.status;
@@ -63,9 +67,11 @@ function useNewsResource(key, loader) {
 }
 
 export function useTopStories(section) {
-  return useNewsResource(`topstories/${section}`, (api) => api.getTopStories(section));
+  const loader = useCallback((api) => api.getTopStories(section), [section]);
+  return useNewsResource(`topstories/${section}`, loader);
 }
 
 export function useMostPopular(days = 1) {
-  return useNewsResource(`mostpopular/${days}`, (api) => api.getMostPopular(days));
+  const loader = useCallback((api) => api.getMostPopular(days), [days]);
+  return useNewsResource(`mostpopular/${days}`, loader);
 }
